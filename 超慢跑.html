@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>節拍器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .active-btn { background-color: #3b82f6 !important; color: white !important; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex justify-center pt-8 p-4">
+
+    <div class="bg-white p-8 rounded-3xl shadow-lg w-full max-w-sm border border-slate-100 text-center">
+        <h1 class="text-xl font-bold text-slate-800 mb-6">節拍器</h1>
+        
+        <div class="mb-6">
+            <p class="text-xs text-slate-400 mb-3 tracking-widest uppercase">練習時長 (分鐘)</p>
+            <div class="grid grid-cols-4 gap-2">
+                <button onclick="setTime(10)" id="time-10" class="time-btn py-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition">10</button>
+                <button onclick="setTime(20)" id="time-20" class="time-btn py-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition">20</button>
+                <button onclick="setTime(30)" id="time-30" class="time-btn py-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition">30</button>
+                <button onclick="setTime(40)" id="time-40" class="time-btn py-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition">40</button>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <p class="text-xs text-slate-400 mb-3 tracking-widest uppercase">目標速度 (BPM)</p>
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="setBpm(180)" id="bpm-180" class="bpm-btn py-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition">180</button>
+                <button onclick="setBpm(190)" id="bpm-190" class="bpm-btn py-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition">190</button>
+                <button onclick="setBpm(200)" id="bpm-200" class="bpm-btn py-2 bg-slate-100 rounded-xl hover:bg-slate-200 transition">200</button>
+            </div>
+        </div>
+
+        <div id="timer-display" class="text-5xl font-mono font-light text-slate-700 mb-8">00:00</div>
+
+        <div class="flex gap-2">
+            <button id="toggle-btn" onclick="toggleMetronome()" class="flex-grow py-4 bg-slate-900 text-white font-semibold rounded-2xl hover:bg-slate-800 transition active:scale-95">
+                開始練習
+            </button>
+            <button id="reset-btn" onclick="resetMetronome()" class="px-6 py-4 bg-slate-200 text-slate-600 font-semibold rounded-2xl hover:bg-slate-300 transition active:scale-95">
+                重置
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let duration = 10;
+        let bpm = 180;
+        let isRunning = false;
+        let timerInterval, metronomeInterval;
+        let timeElapsed = 0;
+        let beatCount = 0;
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playBeatSound(isHigh) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(isHigh ? 1200 : 800, audioCtx.currentTime);
+            
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.03);
+        }
+
+        function setTime(m) {
+            duration = m;
+            document.querySelectorAll('.time-btn').forEach(el => el.classList.remove('active-btn'));
+            document.getElementById(`time-${m}`).classList.add('active-btn');
+            resetMetronome();
+        }
+
+        function setBpm(b) {
+            bpm = b;
+            document.querySelectorAll('.bpm-btn').forEach(el => el.classList.remove('active-btn'));
+            document.getElementById(`bpm-${b}`).classList.add('active-btn');
+        }
+
+        function toggleMetronome() {
+            const btn = document.getElementById('toggle-btn');
+            if (isRunning) {
+                // 暫停邏輯
+                clearInterval(timerInterval);
+                clearInterval(metronomeInterval);
+                btn.textContent = "繼續練習";
+                btn.classList.replace('bg-rose-600', 'bg-blue-600');
+                isRunning = false;
+            } else {
+                // 開始/繼續邏輯
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                timerInterval = setInterval(() => {
+                    timeElapsed++;
+                    updateDisplay();
+                    if (timeElapsed >= duration * 60) {
+                        resetMetronome();
+                    }
+                }, 1000);
+                
+                metronomeInterval = setInterval(() => {
+                    playBeatSound(beatCount % 2 === 0);
+                    beatCount++;
+                }, (60 / bpm) * 1000);
+                
+                btn.textContent = "暫停";
+                btn.classList.replace('bg-blue-600', 'bg-rose-600');
+                btn.classList.replace('bg-slate-900', 'bg-rose-600');
+                isRunning = true;
+            }
+        }
+
+        function resetMetronome() {
+            clearInterval(timerInterval);
+            clearInterval(metronomeInterval);
+            isRunning = false;
+            timeElapsed = 0;
+            beatCount = 0;
+            updateDisplay();
+            const btn = document.getElementById('toggle-btn');
+            btn.textContent = "開始練習";
+            btn.className = "flex-grow py-4 bg-slate-900 text-white font-semibold rounded-2xl hover:bg-slate-800 transition active:scale-95";
+        }
+
+        function updateDisplay() {
+            const m = Math.floor(timeElapsed / 60);
+            const s = timeElapsed % 60;
+            document.getElementById('timer-display').textContent = 
+                `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        // 初始化
+        setTime(10);
+        setBpm(180);
+    </script>
+</body>
+</html>
